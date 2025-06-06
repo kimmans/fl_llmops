@@ -345,14 +345,11 @@ with st.sidebar:
         )
     
     temperature = st.slider("창의성", 0.0, 1.0, 0.7, 0.1)
-
-    for _ in range(30):
-        st.write("")
     
-    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Last Update: 2025-06-06</span>', unsafe_allow_html=True)
-    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Version: 1.0.1</span>', unsafe_allow_html=True)
-    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Made by: KIM JINMAN</span>', unsafe_allow_html=True)
-    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Contact: jmhanmu@gmail.com</span>', unsafe_allow_html=True)
+    st.markdown("### Made by: jmhanmu@gmail.com")
+    st.markdown("### Last Update: 2025-06-06")
+    
+    
 
 # 메인 영역
 col1, col2 = st.columns([1, 1])
@@ -374,11 +371,13 @@ with col1:
         )
     
     elif input_method == "파일 업로드":
-        file_types = ["txt", "csv", "json", "md"]
-        if PDF_AVAILABLE:
-            file_types.append("pdf")
+        file_types = ["txt", "csv", "json", "md", "pdf"]
         
-        uploaded_file = st.file_uploader("📎 파일 업로드", type=file_types)
+        uploaded_file = st.file_uploader(
+            "📎 파일 업로드", 
+            type=file_types,
+            key=f"file_upload_{st.session_state.reset_counter}"
+        )
         
         if uploaded_file is not None:
             try:
@@ -411,7 +410,7 @@ with col1:
     # 프롬프트 입력 (필수)
     prompt_input = st.text_area(
         "💡 프롬프트 입력", 
-        height=500, 
+        height=200, 
         placeholder="AI에게 요청할 작업을 입력하세요",
         key=f"prompt_input_{st.session_state.reset_counter}"
     )
