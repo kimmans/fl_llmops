@@ -578,6 +578,10 @@ with st.sidebar:
     st.markdown("### 📊 현재 설정")
     st.info(f"**모델**: {model_choice}\n**창의성**: {temperature}")
     
+    #만든 이
+    st.markdown("---")
+    st.markdown("### Made by: KIM JINMAN")
+
     # 통계
     if st.session_state.results_history:
         st.markdown("### 📈 세션 통계")
