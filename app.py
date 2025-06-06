@@ -410,7 +410,7 @@ with col1:
     # 프롬프트 입력 (필수)
     prompt_input = st.text_area(
         "💡 프롬프트 입력", 
-        height=200, 
+        height=400, 
         placeholder="AI에게 요청할 작업을 입력하세요",
         key=f"prompt_input_{st.session_state.reset_counter}"
     )
