@@ -66,6 +66,8 @@ if 'results_history' not in st.session_state:
     st.session_state.results_history = []
 if 'multi_results' not in st.session_state:
     st.session_state.multi_results = []
+if 'reset_counter' not in st.session_state:
+    st.session_state.reset_counter = 0
 
 def check_api_keys():
     return {
@@ -299,8 +301,11 @@ st.title("🚀 프롬프트 LLMOps Dashboard")
 col_title, col_reset = st.columns([4, 1])
 with col_reset:
     if st.button("🔄 전체 초기화", type="secondary", use_container_width=True):
-        # 모든 세션 상태 초기화
-        for key in list(st.session_state.keys()):
+        # 리셋 카운터 증가 (위젯 key 변경용)
+        st.session_state.reset_counter += 1
+        # 모든 세션 상태 초기화 (reset_counter 제외)
+        keys_to_delete = [key for key in st.session_state.keys() if key != 'reset_counter']
+        for key in keys_to_delete:
             del st.session_state[key]
         st.rerun()
 
@@ -339,11 +344,15 @@ with st.sidebar:
             max_selections=4
         )
     
-    temperature = st.slider("🌡️ Temperature", 0.0, 1.0, 0.7, 0.1)
+    temperature = st.slider("창의성", 0.0, 1.0, 0.7, 0.1)
+
+    for _ in range(30):
+        st.write("")
     
-    st.markdown("### Made by: KIM JINMAN")
-    st.markdown("### Last Update: 2025-06-06")
-    st.markdown("### Version: 1.0.1")
+    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Last Update: 2025-06-06</span>', unsafe_allow_html=True)
+    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Version: 1.0.1</span>', unsafe_allow_html=True)
+    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Made by: KIM JINMAN</span>', unsafe_allow_html=True)
+    st.markdown('<span style="color: #b0b0b0; font-weight: normal;">Contact: jmhanmu@gmail.com</span>', unsafe_allow_html=True)
 
 # 메인 영역
 col1, col2 = st.columns([1, 1])
@@ -357,7 +366,12 @@ with col1:
     data_input = ""
     
     if input_method == "텍스트 입력":
-        data_input = st.text_area("📄 데이터 입력", height=200, placeholder="분석할 데이터를 입력하세요 (선택사항)")
+        data_input = st.text_area(
+            "📄 데이터 입력", 
+            height=200, 
+            placeholder="분석할 데이터를 입력하세요 (선택사항)",
+            key=f"data_input_{st.session_state.reset_counter}"
+        )
     
     elif input_method == "파일 업로드":
         file_types = ["txt", "csv", "json", "md"]
@@ -395,7 +409,12 @@ with col1:
                 data_input = ""
     
     # 프롬프트 입력 (필수)
-    prompt_input = st.text_area("💡 프롬프트 입력", height=200, placeholder="AI에게 요청할 작업을 입력하세요")
+    prompt_input = st.text_area(
+        "💡 프롬프트 입력", 
+        height=500, 
+        placeholder="AI에게 요청할 작업을 입력하세요",
+        key=f"prompt_input_{st.session_state.reset_counter}"
+    )
     
     # 실행 버튼 - 프롬프트만 있으면 실행 가능
     can_execute = bool(prompt_input and prompt_input.strip()) and bool(selected_models) and "API 키 없음" not in selected_models
