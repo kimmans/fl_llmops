@@ -278,6 +278,9 @@ api_status = check_api_keys()
 with st.sidebar:
     st.header("⚙️ 설정")
     
+    # 모드 선택
+    execution_mode = st.radio("실행 모드", ["단일 모델", "다중 모델 비교"], horizontal=True)
+    
     available_models = []
     if api_status["OpenAI"]:
         available_models.extend(["GPT-4o", "GPT-4o-mini"])
@@ -291,7 +294,17 @@ with st.sidebar:
     if not available_models:
         available_models = ["API 키 없음"]
     
-    model_choice = st.selectbox("🤖 AI 모델 선택", available_models)
+    if execution_mode == "단일 모델":
+        model_choice = st.selectbox("🤖 AI 모델 선택", available_models)
+        selected_models = [model_choice] if model_choice != "API 키 없음" else []
+    else:
+        selected_models = st.multiselect(
+            "🤖 AI 모델 선택 (최대 4개)",
+            available_models,
+            default=[available_models[0]] if available_models and available_models[0] != "API 키 없음" else [],
+            max_selections=4
+        )
+    
     temperature = st.slider("🌡️ Temperature", 0.0, 1.0, 0.7, 0.1)
     
     st.markdown("### Made by: KIM JINMAN")
@@ -349,11 +362,11 @@ with col1:
     prompt_input = st.text_area("💡 프롬프트 입력", height=200, placeholder="AI에게 요청할 작업을 입력하세요")
     
     # 실행 버튼 - 프롬프트만 있으면 실행 가능
-    can_execute = bool(prompt_input and prompt_input.strip()) and model_choice != "API 키 없음"
+    can_execute = bool(prompt_input and prompt_input.strip()) and bool(selected_models) and "API 키 없음" not in selected_models
     
     if st.button("🚀 프롬프트 실행", type="primary", disabled=not can_execute):
         if can_execute:
-            with st.spinner("AI가 응답을 생성 중입니다..."):
+            with st.spinner(f"AI가 응답을 생성 중입니다... ({len(selected_models)}개 모델)"):
                 model_functions = {
                     "GPT-4o": lambda p, d, t: call_openai(p, d, t, "GPT-4o"),
                     "GPT-4o-mini": lambda p, d, t: call_openai(p, d, t, "GPT-4o-mini"),
@@ -366,17 +379,66 @@ with col1:
                     "Gemini 2.0 Flash": lambda p, d, t: call_gemini(p, d, t, "Gemini 2.0 Flash")
                 }
                 
-                result = model_functions[model_choice](prompt_input, data_input, temperature)
-                result['prompt'] = prompt_input
-                result['data_preview'] = data_input[:200] + "..." if len(data_input) > 200 else data_input
+                # 선택된 모델들에 대해 순차적으로 실행
+                results = []
+                for model in selected_models:
+                    result = model_functions[model](prompt_input, data_input, temperature)
+                    result['prompt'] = prompt_input
+                    result['data_preview'] = data_input[:200] + "..." if len(data_input) > 200 else data_input
+                    results.append(result)
+                    st.session_state.results_history.append(result)
                 
-                st.session_state.results_history.append(result)
+                # 다중 모델 결과를 세션에 저장
+                if len(selected_models) > 1:
+                    st.session_state.multi_results = results
+                
                 st.rerun()
 
 with col2:
     st.header("📊 결과")
     
-    if st.session_state.results_history:
+    # 다중 모델 결과 표시
+    if hasattr(st.session_state, 'multi_results') and st.session_state.multi_results:
+        st.subheader("🔄 다중 모델 비교 결과")
+        
+        # 탭으로 각 모델 결과 표시
+        if len(st.session_state.multi_results) > 1:
+            tabs = st.tabs([result['model'] for result in st.session_state.multi_results])
+            
+            for i, (tab, result) in enumerate(zip(tabs, st.session_state.multi_results)):
+                with tab:
+                    if result.get('error', False):
+                        st.error(f"❌ 오류: {result['response']}")
+                    else:
+                        st.success(f"✅ 응답 완료")
+                        st.text_area("AI 응답", value=result['response'], height=300, disabled=True, key=f"multi_response_{i}")
+                        
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        with col_m1:
+                            st.metric("토큰", result.get('tokens_used', 0))
+                        with col_m2:
+                            st.metric("응답 길이", len(result['response']))
+                        with col_m3:
+                            cost = result.get('cost', 0.0)
+                            st.metric("비용", f"${cost:.6f}")
+            
+            # 비교 요약
+            st.subheader("📈 비교 요약")
+            comparison_data = []
+            for result in st.session_state.multi_results:
+                comparison_data.append({
+                    '모델': result['model'],
+                    '상태': '성공' if not result.get('error', False) else '오류',
+                    '토큰': result.get('tokens_used', 0),
+                    '비용': f"${result.get('cost', 0):.6f}",
+                    '응답 길이': len(result['response'])
+                })
+            
+            df_comparison = pd.DataFrame(comparison_data)
+            st.dataframe(df_comparison, use_container_width=True)
+    
+    # 단일 모델 결과 표시
+    elif st.session_state.results_history:
         latest_result = st.session_state.results_history[-1]
         
         if latest_result.get('error', False):
