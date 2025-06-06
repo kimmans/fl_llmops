@@ -8,7 +8,7 @@ Made by: KIM JINMAN
 
 ### 🤖 지원 모델
 - **OpenAI**: GPT-4o, GPT-4o-mini
-- **Anthropic**: Claude Sonnet 4, Claude Sonnet 3.5, Claude Haiku 3.5  
+- **Anthropic**: Claude Sonnet 4, Claude Sonnet 3.7
 - **Google**: Gemini 1.5 Flash, Gemini 1.5 Pro, Gemini 2.0 Flash
 - **Perplexity**: Sonar, Sonar Pro
 
