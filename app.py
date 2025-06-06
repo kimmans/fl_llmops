@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import json
 import os
+import time
 from typing import Dict, Any
 import requests
 from dotenv import load_dotenv
@@ -63,6 +64,8 @@ def calculate_cost(model_name: str, input_tokens: int, output_tokens: int) -> fl
 # 세션 상태 초기화
 if 'results_history' not in st.session_state:
     st.session_state.results_history = []
+if 'multi_results' not in st.session_state:
+    st.session_state.multi_results = []
 
 def check_api_keys():
     return {
@@ -90,6 +93,7 @@ def call_openai(prompt: str, data: str, temperature: float, model_name: str) -> 
         return {"model": model_name, "response": "OpenAI API 키 오류", "error": True}
     
     try:
+        start_time = time.time()
         model_mapping = {"GPT-4o": "gpt-4o", "GPT-4o-mini": "gpt-4o-mini"}
         api_model = model_mapping.get(model_name, "gpt-4o-mini")
         
@@ -105,6 +109,9 @@ def call_openai(prompt: str, data: str, temperature: float, model_name: str) -> 
             max_tokens=2000
         )
         
+        end_time = time.time()
+        response_time = end_time - start_time
+        
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
         cost = calculate_cost(model_name, input_tokens, output_tokens)
@@ -118,6 +125,7 @@ def call_openai(prompt: str, data: str, temperature: float, model_name: str) -> 
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
+            "response_time": response_time,
             "error": False
         }
     except Exception as e:
@@ -128,6 +136,7 @@ def call_claude(prompt: str, data: str, temperature: float, model_name: str) -> 
         return {"model": model_name, "response": "Anthropic API 키 오류", "error": True}
     
     try:
+        start_time = time.time()
         model_mapping = {
             "Claude Sonnet 4": "claude-3-5-sonnet-20241022",
             "Claude Sonnet 3.7": "claude-3-5-sonnet-20241022"
@@ -146,6 +155,9 @@ def call_claude(prompt: str, data: str, temperature: float, model_name: str) -> 
             messages=[{"role": "user", "content": full_prompt}]
         )
         
+        end_time = time.time()
+        response_time = end_time - start_time
+        
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         cost = calculate_cost(model_name, input_tokens, output_tokens)
@@ -159,6 +171,7 @@ def call_claude(prompt: str, data: str, temperature: float, model_name: str) -> 
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
+            "response_time": response_time,
             "error": False
         }
     except Exception as e:
@@ -170,6 +183,7 @@ def call_perplexity(prompt: str, data: str, temperature: float, model_name: str)
         return {"model": model_name, "response": "Perplexity API 키 오류", "error": True}
     
     try:
+        start_time = time.time()
         url = "https://api.perplexity.ai/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         
@@ -195,6 +209,9 @@ def call_perplexity(prompt: str, data: str, temperature: float, model_name: str)
         response.raise_for_status()
         result = response.json()
         
+        end_time = time.time()
+        response_time = end_time - start_time
+        
         input_tokens = result.get('usage', {}).get('prompt_tokens', 0)
         output_tokens = result.get('usage', {}).get('completion_tokens', 0)
         cost = calculate_cost(model_name, input_tokens, output_tokens)
@@ -208,6 +225,7 @@ def call_perplexity(prompt: str, data: str, temperature: float, model_name: str)
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
+            "response_time": response_time,
             "error": False
         }
     except Exception as e:
@@ -218,6 +236,7 @@ def call_gemini(prompt: str, data: str, temperature: float, model_name: str) -> 
         return {"model": model_name, "response": "Gemini API 키 오류", "error": True}
     
     try:
+        start_time = time.time()
         model_mapping = {
             "Gemini 1.5 Flash": "gemini-1.5-flash",
             "Gemini 1.5 Pro": "gemini-1.5-pro",
@@ -239,6 +258,9 @@ def call_gemini(prompt: str, data: str, temperature: float, model_name: str) -> 
         response = model_client.generate_content(full_prompt, generation_config=generation_config)
         response_text = response.text if hasattr(response, 'text') and response.text else "응답 생성 실패"
         
+        end_time = time.time()
+        response_time = end_time - start_time
+        
         input_tokens = int(len(full_prompt.split()) * 1.3)
         output_tokens = int(len(response_text.split()) * 1.3)
         cost = calculate_cost(model_name, input_tokens, output_tokens)
@@ -252,6 +274,7 @@ def call_gemini(prompt: str, data: str, temperature: float, model_name: str) -> 
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": cost,
+            "response_time": response_time,
             "error": False
         }
     except Exception as e:
@@ -271,6 +294,17 @@ def read_pdf(uploaded_file):
 
 # UI
 st.title("🚀 프롬프트 LLMOps Dashboard")
+
+# 상단에 전체 초기화 버튼 추가
+col_title, col_reset = st.columns([4, 1])
+with col_reset:
+    if st.button("🔄 전체 초기화", type="secondary", use_container_width=True):
+        # 모든 세션 상태 초기화
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+st.markdown("---")
 
 api_status = check_api_keys()
 
@@ -393,6 +427,9 @@ with col1:
                 # 다중 모델 결과를 세션에 저장
                 if len(selected_models) > 1:
                     st.session_state.multi_results = results
+                else:
+                    # 단일 모델인 경우 multi_results 초기화
+                    st.session_state.multi_results = []
                 
                 st.rerun()
 
@@ -404,43 +441,46 @@ with col2:
         st.subheader("🔄 다중 모델 비교 결과")
         
         # 탭으로 각 모델 결과 표시
-        if len(st.session_state.multi_results) > 1:
-            tabs = st.tabs([result['model'] for result in st.session_state.multi_results])
-            
-            for i, (tab, result) in enumerate(zip(tabs, st.session_state.multi_results)):
-                with tab:
-                    if result.get('error', False):
-                        st.error(f"❌ 오류: {result['response']}")
-                    else:
-                        st.success(f"✅ 응답 완료")
-                        st.text_area("AI 응답", value=result['response'], height=300, disabled=True, key=f"multi_response_{i}")
-                        
-                        col_m1, col_m2, col_m3 = st.columns(3)
-                        with col_m1:
-                            st.metric("토큰", result.get('tokens_used', 0))
-                        with col_m2:
-                            st.metric("응답 길이", len(result['response']))
-                        with col_m3:
-                            cost = result.get('cost', 0.0)
-                            st.metric("비용", f"${cost:.6f}")
-            
-            # 비교 요약
-            st.subheader("📈 비교 요약")
-            comparison_data = []
-            for result in st.session_state.multi_results:
-                comparison_data.append({
-                    '모델': result['model'],
-                    '상태': '성공' if not result.get('error', False) else '오류',
-                    '토큰': result.get('tokens_used', 0),
-                    '비용': f"${result.get('cost', 0):.6f}",
-                    '응답 길이': len(result['response'])
-                })
-            
-            df_comparison = pd.DataFrame(comparison_data)
-            st.dataframe(df_comparison, use_container_width=True)
+        tabs = st.tabs([result['model'] for result in st.session_state.multi_results])
+        
+        for i, (tab, result) in enumerate(zip(tabs, st.session_state.multi_results)):
+            with tab:
+                if result.get('error', False):
+                    st.error(f"❌ 오류: {result['response']}")
+                else:
+                    st.success(f"✅ 응답 완료")
+                    st.text_area("AI 응답", value=result['response'], height=300, disabled=True, key=f"multi_response_{i}")
+                    
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    with col_m1:
+                        st.metric("토큰", result.get('tokens_used', 0))
+                    with col_m2:
+                        st.metric("응답 길이", len(result['response']))
+                    with col_m3:
+                        cost = result.get('cost', 0.0)
+                        st.metric("비용", f"${cost:.6f}")
+                    with col_m4:
+                        response_time = result.get('response_time', 0)
+                        st.metric("응답시간", f"{response_time:.2f}초")
+        
+        # 비교 요약
+        st.subheader("📈 비교 요약")
+        comparison_data = []
+        for result in st.session_state.multi_results:
+            comparison_data.append({
+                '모델': result['model'],
+                '상태': '성공' if not result.get('error', False) else '오류',
+                '토큰': result.get('tokens_used', 0),
+                '비용': f"${result.get('cost', 0):.6f}",
+                '응답 길이': len(result['response']),
+                '응답시간': f"{result.get('response_time', 0):.2f}초"
+            })
+        
+        df_comparison = pd.DataFrame(comparison_data)
+        st.dataframe(df_comparison, use_container_width=True)
     
-    # 단일 모델 결과 표시
-    elif st.session_state.results_history:
+    # 단일 모델 결과 표시 (다중 모델이 아닌 경우에만)
+    elif st.session_state.results_history and not st.session_state.get('multi_results'):
         latest_result = st.session_state.results_history[-1]
         
         if latest_result.get('error', False):
@@ -449,7 +489,7 @@ with col2:
             st.success(f"✅ {latest_result['model']} 응답 완료")
             st.text_area("AI 응답", value=latest_result['response'], height=400, disabled=True)
             
-            col_metric1, col_metric2, col_metric3 = st.columns(3)
+            col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
             with col_metric1:
                 st.metric("토큰", latest_result.get('tokens_used', 0))
             with col_metric2:
@@ -457,6 +497,9 @@ with col2:
             with col_metric3:
                 cost = latest_result.get('cost', 0.0)
                 st.metric("비용", f"${cost:.6f}")
+            with col_metric4:
+                response_time = latest_result.get('response_time', 0)
+                st.metric("응답시간", f"{response_time:.2f}초")
 
 # 기록 섹션
 if st.session_state.results_history:
@@ -479,6 +522,7 @@ if st.session_state.results_history:
                 '응답': record.get('response', ''),
                 '토큰': record.get('tokens_used', 0),
                 '비용': record.get('cost', 0),
+                '응답시간': f"{record.get('response_time', 0):.2f}초",
                 '상태': '오류' if record.get('error', False) else '성공'
             })
         
@@ -498,6 +542,7 @@ if st.session_state.results_history:
             txt_data += f"응답: {record.get('response', '')}\n"
             txt_data += f"토큰: {record.get('tokens_used', 0)}\n"
             txt_data += f"비용: ${record.get('cost', 0):.6f}\n"
+            txt_data += f"응답시간: {record.get('response_time', 0):.2f}초\n"
             txt_data += f"상태: {'오류' if record.get('error', False) else '성공'}\n"
             txt_data += "-" * 50 + "\n\n"
         
@@ -524,4 +569,4 @@ if st.session_state.results_history:
                 st.error(record['response'])
             else:
                 st.text_area("응답", value=record['response'], height=150, key=f"history_{i}", disabled=True)
-                st.caption(f"토큰: {record.get('tokens_used', 0)} | 비용: ${record.get('cost', 0):.6f}")
+                st.caption(f"토큰: {record.get('tokens_used', 0)} | 비용: ${record.get('cost', 0):.6f} | 응답시간: {record.get('response_time', 0):.2f}초")
