@@ -308,6 +308,8 @@ with st.sidebar:
     temperature = st.slider("🌡️ Temperature", 0.0, 1.0, 0.7, 0.1)
     
     st.markdown("### Made by: KIM JINMAN")
+    st.markdown("### Last Update: 2025-06-06")
+    st.markdown("### Version: 1.0.1")
 
 # 메인 영역
 col1, col2 = st.columns([1, 1])
